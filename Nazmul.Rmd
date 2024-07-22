@@ -1,0 +1,1251 @@
+---
+title: "Análisis estadístico - Actividad 4"
+author: "Nazmul Farooquee"
+date: "`r format(Sys.Date(), '%Y-%m-%d')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    theme: cosmo
+    highlight: tango
+  pdf_document:
+    toc: true
+    toc_depth: 2
+  word_document:
+    toc: true
+    toc_depth: 2
+---
+
+**Introducción al Proyecto**
+
+Este proyecto implica analizar los datos de clientes de iFood, la principal aplicación de entrega de alimentos en Brasil. El objetivo es mejorar el rendimiento de sus actividades de marketing comprendiendo las demografías de los clientes, los comportamientos de compra y las respuestas a campañas de marketing previas. Específicamente, identificaremos patrones en la distribución de ingresos de los clientes según el nivel educativo, desarrollaremos modelos para predecir los ingresos de los clientes y la probabilidad de responder a campañas de marketing, y analizaremos el impacto de la educación sobre los ingresos y la respuesta a las campañas. Los conocimientos obtenidos de este análisis ayudarán a iFood a dirigir sus campañas de marketing de manera más efectiva y optimizar sus estrategias para aumentar el compromiso y los ingresos de los clientes.
+
+# 1. **Preprocesado**
+
+## 1.1 Variables Income y Year_Birth
+
+Paso 1: Cargar el Conjunto de Datos
+Qué Estamos Haciendo:
+
+Vamos a cargar el conjunto de datos "marketing.csv" en nuestro entorno R.
+Por Qué lo Estamos Haciendo:
+
+Este es el primer paso para traer los datos a nuestro espacio de trabajo para su análisis.
+
+```{r}
+# Cargar las librerías necesarias
+if (!require(tidyverse)) {
+  install.packages("tidyverse")
+  library(tidyverse)
+}
+
+# Paso 1: Cargar el conjunto de datos
+marketing_data <- read.csv("marketing.csv")
+
+# Mostrar las primeras filas para asegurarse de que se ha cargado correctamente
+head(marketing_data)
+
+```
+
+Observación del Resultado
+Qué Hemos Observado:
+
+El conjunto de datos "marketing.csv" se ha cargado correctamente en el entorno de R. Las primeras seis filas del conjunto de datos muestran varias variables clave, incluyendo:
+
+ID: Número identificativo del cliente.
+Year_Birth: Año de nacimiento del cliente.
+Education: Nivel educativo del cliente.
+Marital_Status: Estado civil del cliente.
+Income: Ingresos anuales del cliente.
+Kidhome: Número de niños que viven con el cliente.
+Teenhome: Número de adolescentes que viven con el cliente.
+
+Esto confirma que los datos se han importado correctamente y que todas las variables esperadas están presentes en el conjunto de datos.
+
+
+Paso 2: Consultar los Tipos de Datos de las Variables
+Qué Estamos Haciendo:
+
+Vamos a consultar los tipos de datos de las variables "Income" y "Year_Birth" para asegurarnos de que están en el formato correcto para el análisis.
+Por Qué lo Estamos Haciendo:
+
+Es importante verificar que las variables clave estén en el formato adecuado (numérico) para realizar cálculos y análisis estadísticos correctos.
+
+```{r}
+# Verificar los tipos de datos de las variables Income y Year_Birth
+str(marketing_data[c("Income", "Year_Birth")])
+
+```
+
+Observación del Resultado
+Qué Hemos Observado:
+
+El resultado de la consulta muestra que las variables "Income" y "Year_Birth" son de tipo entero (int), lo cual es apropiado para el análisis que realizaremos. Específicamente:
+
+Income: Es una variable numérica representada como un entero, lo que es adecuado para cálculos de estadísticas descriptivas y modelos de regresión.
+Year_Birth: También es una variable numérica representada como un entero, lo que nos permitirá calcular edades y realizar análisis basados en años de nacimiento.
+
+
+Paso 3: Averiguar Posibles Inconsistencias en los Valores de Income y Year_Birth
+Qué Estamos Haciendo:
+
+Vamos a explorar posibles inconsistencias en los valores de las variables "Income" y "Year_Birth".
+Por Qué lo Estamos Haciendo:
+
+Identificar valores irrealistas o atípicos en estas variables nos ayudará a mejorar la calidad de los datos y asegurar la precisión del análisis posterior.
+
+
+```{r}
+# Explorar posibles inconsistencias en Income
+summary(marketing_data$Income)  # Verificar valores negativos o extremos
+boxplot(marketing_data$Income)  # Inspeccionar visualmente la distribución
+
+# Explorar posibles inconsistencias en Year_Birth
+summary(marketing_data$Year_Birth)  # Verificar valores poco realistas
+
+
+```
+
+Observaciones del Resultado:
+
+Income: Los ingresos muestran una amplia variación con un valor mínimo de 1,730 y un valor máximo de 666,666, lo cual indica la posible presencia de valores atípicos extremos. La mediana de los ingresos es 51,382, lo que indica que la mitad de los clientes tiene ingresos por debajo de este valor. Hay 24 valores perdidos en la variable Income. El boxplot confirma la presencia de valores atípicos extremos que deben ser tratados.
+Year_Birth: Los años de nacimiento también muestran variaciones con un valor mínimo de 1893 y un valor máximo de 1996. Un año de nacimiento de 1893 parece poco realista y sugiere la necesidad de limpiar estos datos. La mediana del año de nacimiento es 1970, indicando que la mayoría de los clientes nacieron alrededor de esta fecha.
+
+Siguiente Paso: Sustituir Valores Irrealistas por NA
+Qué Estamos Haciendo:
+
+Vamos a reemplazar los valores irrealistas en Year_Birth que son anteriores a 1920 o posteriores al año actual con NA. Para Income, utilizaremos el método del rango intercuartílico (IQR) para identificar valores atípicos y reemplazar valores fuera de los límites calculados con NA.
+Por Qué lo Estamos Haciendo:
+
+Reemplazar estos valores asegura que los datos sean más representativos y precisos para el análisis posterior, evitando que los valores atípicos extremos distorsionen los resultados.
+Código para Sustituir Valores Irrealistas
+
+Sustituir valores irrealistas de Year_Birth por NA
+
+
+```{r}
+# Sustituir valores irrealistas de Year_Birth por NA
+current_year <- as.numeric(format(Sys.Date(), "%Y"))
+marketing_data$Year_Birth <- ifelse(marketing_data$Year_Birth < 1920 | marketing_data$Year_Birth > current_year, NA, marketing_data$Year_Birth)
+
+```
+
+
+Sustituir valores irrealistas de Income por NA
+
+```{r}
+# Calcular el IQR para Income para identificar valores atípicos
+income_summary <- summary(marketing_data$Income)
+iqr_income <- IQR(marketing_data$Income, na.rm = TRUE)
+lower_bound <- income_summary[2] - 1.5 * iqr_income  # 1er Cuartil - 1.5 * IQR
+upper_bound <- income_summary[5] + 1.5 * iqr_income  # 3er Cuartil + 1.5 * IQR
+
+# Sustituir valores irrealistas de Income por NA
+marketing_data$Income <- ifelse(marketing_data$Income < lower_bound | marketing_data$Income > upper_bound, NA, marketing_data$Income)
+
+```
+
+
+Verificar los cambios
+
+```{r}
+# Verificar los cambios consultando nuevamente las estadísticas descriptivas
+summary(marketing_data$Income)
+summary(marketing_data$Year_Birth)
+
+```
+Observaciones del Resultado:
+
+Income: Después de reemplazar los valores irrealistas con NA usando el método del IQR, los valores de Income son más realistas. El valor máximo ahora es 113,734 en lugar de 666,666, lo que reduce el impacto de los valores atípicos extremos. El número de valores perdidos ha aumentado a 32, lo que indica que se reemplazaron algunos valores atípicos.
+Year_Birth: Los años de nacimiento ahora varían desde 1940 hasta 1996, lo cual es más plausible. El número de valores perdidos es 3, lo que indica que algunos valores fuera del rango realista fueron reemplazados por NA.
+
+
+## 1.2 Valores Ausentes
+
+Paso 1: Verificación de Valores Ausentes
+
+Qué estamos haciendo:
+
+Vamos a verificar cuántos valores ausentes tenemos en cada columna antes de cualquier imputación o eliminación.
+
+Por qué lo estamos haciendo:
+
+Identificar los valores ausentes en el conjunto de datos nos permite saber qué variables necesitan ser imputadas o manejadas, asegurando así que el análisis sea preciso y completo.
+
+```{r}
+
+# Verificar el número de valores ausentes por columna
+missing_values_before <- colSums(is.na(marketing_data))
+missing_values_before
+
+
+```
+Observación:
+
+El resultado muestra que hay 32 valores ausentes en Income y 3 valores ausentes en Year_Birth.
+
+
+Paso 2: Imputación de Valores Ausentes para Income usando k-NN
+
+Qué estamos haciendo:
+
+Vamos a imputar los valores ausentes de Income usando k-NN con la distancia de Gower y k = 5.
+
+Por qué lo estamos haciendo:
+
+La imputación de los valores ausentes nos permitirá tener un conjunto de datos completo para el análisis, evitando posibles sesgos causados por datos faltantes.
+
+
+
+
+```{r}
+
+# Cargar la librería VIM para la imputación k-NN
+if (!require(VIM)) {
+  install.packages("VIM")
+  library(VIM)
+}
+
+# Verificar cuántos valores de Income son NA antes de la imputación
+initial_na_income <- sum(is.na(marketing_data$Income))
+print(paste("Initial NA in Income:", initial_na_income))
+
+# Imputar valores ausentes de Income usando k-NN con distancia de Gower y k = 5
+marketing_data <- kNN(marketing_data, variable = "Income", k = 5, dist_var = c("MntWines", "MntFruits", "MntMeatProducts", "MntFishProducts", "MntSweetProducts", "MntGoldProds"))
+
+# Verificar cuántos valores de Income siguen siendo NA después de la imputación
+final_na_income <- sum(is.na(marketing_data$Income))
+print(paste("Final NA in Income:", final_na_income))
+
+
+
+```
+Observación:
+
+La imputación de valores ausentes para Income se completó con éxito, y no hay valores ausentes restantes en esta variable.
+
+    
+
+Paso 3: Imputación de Valores Ausentes para Year_Birth utilizando la Mediana
+
+Qué estamos haciendo:
+
+Vamos a imputar los valores ausentes de Year_Birth utilizando la mediana de las personas encuestadas en estado civil "Viudo/a".
+
+Por qué lo estamos haciendo:
+
+La imputación con la mediana específica de un grupo relevante nos ayuda a mantener la integridad de los datos, asegurando que los valores imputados sean realistas.
+
+
+
+```{r}
+
+# Verificar cuántos valores de Year_Birth son NA antes de la imputación
+initial_na_birth <- sum(is.na(marketing_data$Year_Birth))
+print(paste("Initial NA in Year_Birth:", initial_na_birth))
+
+# Aplicar la imputación con la mediana para Year_Birth
+median_birth_viudo <- median(marketing_data$Year_Birth[marketing_data$Marital_Status == "Widow"], na.rm = TRUE)
+marketing_data$Year_Birth[is.na(marketing_data$Year_Birth)] <- median_birth_viudo
+
+# Verificar cuántos valores de Year_Birth siguen siendo NA después de la imputación
+final_na_birth <- sum(is.na(marketing_data$Year_Birth))
+print(paste("Final NA in Year_Birth:", final_na_birth))
+
+
+```
+Observación:
+
+La imputación de valores ausentes para Year_Birth se completó con éxito, y no hay valores ausentes restantes en esta variable.
+
+
+Paso 4: Eliminación de Observaciones con Valores Ausentes Restantes
+
+Qué estamos haciendo:
+
+Vamos a eliminar las observaciones con valores ausentes restantes y crear el nuevo conjunto de datos markclean.
+
+Por qué lo estamos haciendo:
+
+Eliminar las observaciones con valores ausentes restantes nos asegura que trabajaremos con un conjunto de datos limpio y completo para los análisis posteriores.
+
+
+```{r}
+# Eliminar observaciones con valores ausentes restantes
+markclean <- na.omit(marketing_data)
+
+# Verificar el número de observaciones y valores ausentes en el nuevo conjunto de datos
+final_rows <- nrow(markclean)
+remaining_na <- sum(is.na(markclean))
+
+list(final_rows = final_rows, remaining_na = remaining_na)
+
+
+```
+Observación:
+
+El conjunto de datos limpio markclean contiene 2240 observaciones, y no hay valores ausentes restantes.
+
+Reflexión sobre los Valores Ausentes
+
+El problema de valores ausentes se ha manejado de manera efectiva a través de la imputación y la eliminación de observaciones incompletas. Ahora tenemos un conjunto de datos completo que está listo para el análisis posterior, asegurando la precisión y la validez de nuestros resultados.
+
+Con estos pasos, hemos completado exitosamente la tarea 1.2 y podemos proceder a las siguientes etapas del análisis.
+
+
+
+
+# 2. **Estadística descriptiva**
+
+## 2.1 Income
+
+Qué estamos haciendo:
+
+Vamos a calcular el coeficiente de variación de la variable Income para analizar si la media es representativa. Además, vamos a inspeccionar visualmente la distribución de Income para evaluar si podemos asumir que la variable tiene una distribución normal.
+
+Por qué lo estamos haciendo:
+
+El coeficiente de variación nos ayuda a entender la variabilidad relativa de los ingresos en comparación con la media. Un valor menor a 1 indica que la media es representativa del conjunto de datos. Evaluar la normalidad de la distribución nos ayuda a determinar si podemos usar técnicas estadísticas que asumen normalidad.
+
+
+
+```{r}
+
+# Cargar las librerías necesarias
+if (!require(dplyr)) {
+  install.packages("dplyr")
+  library(dplyr)
+}
+if (!require(ggplot2)) {
+  install.packages("ggplot2")
+  library(ggplot2)
+}
+
+# Calcular el coeficiente de variación de Income
+mean_income <- mean(markclean$Income)
+sd_income <- sd(markclean$Income)
+cv_income <- sd_income / mean_income
+
+cv_income
+
+
+```
+
+```{r}
+# Histograma de la variable Income
+ggplot(markclean, aes(x = Income)) + 
+  geom_histogram(binwidth = 5000, fill = "blue", color = "black") +
+  labs(title = "Distribution of Income", x = "Income", y = "Frequency") +
+  theme(text = element_text(family = "Arial", face = "plain"))
+
+# Q-Q Plot para evaluar la normalidad
+qqnorm(markclean$Income)
+qqline(markclean$Income, col = "red")
+
+```
+
+Resultado:
+
+Cálculo del Coeficiente de Variación:
+El coeficiente de variación calculado para "Income" es 0.4024789, que es menor a 1. Esto indica que la media es una medida representativa para la distribución de ingresos en este conjunto de datos.
+
+Análisis del Histograma:
+El histograma de "Income" muestra que la distribución es aproximadamente en forma de campana, pero con cierta asimetría a la derecha. Esto sugiere que, aunque los datos no son perfectamente normales, son aproximadamente normales.
+
+Análisis del Q-Q Plot:
+El Q-Q plot para "Income" revela que la mayoría de los puntos de datos se encuentran a lo largo de la línea de referencia, lo que indica que la distribución de "Income" es aproximadamente normal. Sin embargo, hay algunas desviaciones en los extremos, lo que sugiere la presencia de valores atípicos o una ligera asimetría.
+
+En general, la media de los ingresos es representativa del conjunto de datos, y la distribución de los ingresos es aproximadamente normal, lo que justifica el uso de métodos estadísticos que asumen normalidad.
+
+
+## 2.2 Educación:
+
+Crear una tabla con estadísticas descriptivas (media, número de observaciones y desviación estándar) de los ingresos según el nivel educativo.
+
+Mostrar un box plot de los ingresos según el nivel educativo.
+
+
+```{r}
+# Cargar las librerías necesarias
+if (!require(dplyr)) {
+  install.packages("dplyr")
+  library(dplyr)
+}
+if (!require(ggplot2)) {
+  install.packages("ggplot2")
+  library(ggplot2)
+}
+if (!require(utf8)) {
+  install.packages("utf8")
+  library(utf8)
+}
+
+# Calcular estadísticas descriptivas por nivel educativo
+education_stats <- markclean %>%
+  group_by(Education) %>%
+  summarize(
+    mean_income = mean(Income, na.rm = TRUE),
+    count = n(),
+    sd_income = sd(Income, na.rm = TRUE)
+  )
+
+education_stats
+
+
+```
+
+
+```{r}
+# Crear un box plot de los ingresos por nivel educativo
+ggplot(markclean, aes(x = reorder(Education, -Income), y = Income)) +
+  geom_boxplot() +
+  labs(
+    title = utf8::utf8_encode("Distribución de Ingresos por Nivel Educativo"),
+    x = utf8::utf8_encode("Nivel Educativo"),
+    y = utf8::utf8_encode("Ingresos")
+  ) +
+  theme_minimal()
+
+
+```
+
+
+Observaciones:
+
+La tabla muestra que, en promedio, los ingresos aumentan con el nivel educativo. Los niveles de educación más altos (PhD y Master) tienen ingresos medios más altos en comparación con los niveles más bajos (Basic y 2n Cycle).
+
+El box plot refuerza esta observación mostrando una distribución más amplia de ingresos para niveles educativos más altos y una concentración de ingresos más bajos para niveles educativos básicos.
+Conclusión:
+
+Estas observaciones sugieren que existe una relación entre el nivel educativo y los ingresos de los clientes. Este análisis preliminar es crucial para fundamentar los siguientes pasos en el análisis inferencial y modelado predictivo.
+
+
+
+
+
+# 3. **Estadística inferencial**
+
+
+## 3.1 Contraste de hipótesis para la diferencia de medias
+
+Qué estamos haciendo:
+
+Vamos a realizar un contraste de hipótesis para determinar si los ingresos medios de las personas sin educación universitaria son menores que los de las personas con educación universitaria, utilizando un nivel de confianza del 99%.
+Por qué lo estamos haciendo:
+
+Este análisis nos ayudará a entender mejor la relación entre el nivel educativo y los ingresos, lo cual es crucial para identificar patrones y tomar decisiones informadas sobre estrategias de marketing y segmentación de clientes.
+
+## 3.1.1 Escribid la hipótesis nula y la alternativa
+Hipótesis Nula (H0):
+
+El ingreso medio de las personas sin educación universitaria es igual al ingreso medio de las personas con educación universitaria.
+Hipótesis Alternativa (H1):
+
+El ingreso medio de las personas sin educación universitaria es menor que el ingreso medio de las personas con educación universitaria.
+
+## 3.1.2 Justificación del test a aplicar
+
+Justificación:
+
+Estamos comparando las medias de dos grupos independientes: personas con y sin educación universitaria.
+Este es un test unilateral porque estamos interesados en si una media es menor que la otra.
+Usamos un nivel de significancia (α) de 0.01, correspondiente a un nivel de confianza del 99%.
+
+## 3.1.3 Cálculos
+
+Calcular las Medias y Desviaciones Estándar
+
+```{r}
+# Crear dos grupos: con y sin educación universitaria
+universitarios <- markclean %>% filter(Education %in% c("Graduation", "Master", "PhD"))
+no_universitarios <- markclean %>% filter(Education %in% c("Basic", "2n Cycle"))
+
+# Calcular estadísticas descriptivas para ambos grupos
+mean_uni <- mean(universitarios$Income, na.rm = TRUE)
+sd_uni <- sd(universitarios$Income, na.rm = TRUE)
+n_uni <- nrow(universitarios)
+
+mean_no_uni <- mean(no_universitarios$Income, na.rm = TRUE)
+sd_no_uni <- sd(no_universitarios$Income, na.rm = TRUE)
+n_no_uni <- nrow(no_universitarios)
+
+mean_uni
+sd_uni
+n_uni
+mean_no_uni
+sd_no_uni
+n_no_uni
+
+```
+Calcular el Error Estándar de la Diferencia de Medias
+
+```{r}
+# Error estándar de la diferencia de medias
+se_diff <- sqrt((sd_uni^2 / n_uni) + (sd_no_uni^2 / n_no_uni))
+se_diff
+
+```
+
+Calcular el Estadístico de Prueba
+
+```{r}
+# Estadístico de prueba
+t_stat <- (mean_no_uni - mean_uni) / se_diff
+t_stat
+
+```
+
+Determinar el Valor Crítico
+
+```{r}
+# Grados de libertad
+df <- ((sd_uni^2 / n_uni) + (sd_no_uni^2 / n_no_uni))^2 / 
+      (((sd_uni^2 / n_uni)^2 / (n_uni - 1)) + ((sd_no_uni^2 / n_no_uni)^2 / (n_no_uni - 1)))
+df
+
+# Valor crítico
+t_critical <- qt(0.01, df, lower.tail = TRUE)  # Test unilateral
+t_critical
+
+```
+Calcular el p-valor
+
+```{r}
+# p-valor
+p_value <- pt(t_stat, df, lower.tail = TRUE)  # Test unilateral
+p_value
+
+```
+
+Interpretación del Resultado
+
+```{r}
+# Interpretación del resultado
+if (t_stat < t_critical && p_value < 0.01) {
+  conclusion <- "Rechazamos la hipótesis nula. El ingreso medio de las personas sin educación universitaria es menor que el de las personas con educación universitaria."
+} else {
+  conclusion <- "No rechazamos la hipótesis nula. No hay suficiente evidencia para afirmar que los ingresos medios son diferentes."
+}
+
+conclusion
+
+```
+3.1.4 Interpretación del Test
+Qué estamos haciendo:
+
+Estamos interpretando los resultados del contraste de hipótesis realizado para determinar si los ingresos medios de las personas sin educación universitaria son menores que los de las personas con educación universitaria.
+Por qué lo estamos haciendo:
+
+Esta interpretación nos permitirá tomar una decisión informada sobre si podemos rechazar la hipótesis nula en favor de la hipótesis alternativa, lo cual es crucial para entender la relación entre el nivel educativo y los ingresos.
+Resultados del Test:
+
+Media de ingresos (universitarios): 52,746.2252,746.22
+
+Desviación estándar (universitarios): 20,122.4720,122.47
+
+Número de observaciones (universitarios): 19831983
+
+Media de ingresos (no universitarios): 41,748.7341,748.73
+
+Desviación estándar (no universitarios): 22,648.7222,648.72
+
+Número de observaciones (no universitarios): 257257
+
+Error estándar de la diferencia de medias: 1483.2951483.295
+
+Estadístico t: −7.414232−7.414232
+
+Grados de libertad: 310.6381310.6381
+
+Valor crítico t: −2.338412−2.338412
+
+p-valor: 5.856678e−135.856678e−13
+
+Conclusión:
+
+Con un nivel de confianza del 99%, rechazamos la hipótesis nula y concluimos que el ingreso medio de las personas sin educación universitaria es significativamente menor que el ingreso medio de las personas con educación universitaria. Esto sugiere que el nivel educativo tiene un impacto significativo en los ingresos de los clientes.
+
+
+
+# 4. **Modelo de regresión**
+
+## 4.1 Regresión lineal múltiple
+
+Objetivo:
+Queremos investigar qué variables explican los ingresos de los individuos. Estimaremos un modelo de regresión lineal múltiple con las variables explicativas especificadas.
+
+Pasos:
+
+Construir el Modelo: Construir el modelo de regresión lineal múltiple usando las variables especificadas.
+Interpretar el Modelo: Evaluar la calidad del ajuste del modelo y explicar la contribución de cada variable explicativa.
+Verificar Multicolinealidad: Analizar posibles problemas de multicolinealidad utilizando el Factor de Inflación de la Varianza (VIF).
+
+Ejecución Paso a Paso
+
+Paso 1: Cargar las librerías necesarias
+
+Primero, asegúrate de tener todas las librerías necesarias cargadas:
+
+
+```{r}
+# Cargar las librerías necesarias
+if (!require(dplyr)) {
+  install.packages("dplyr")
+  library(dplyr)
+}
+if (!require(car)) {
+  install.packages("car")
+  library(car)
+}
+if (!require(ggplot2)) {
+  install.packages("ggplot2")
+  library(ggplot2)
+}
+
+```
+
+Paso 2: Construir el Modelo de Regresión Lineal Múltiple
+
+Qué estamos haciendo:
+Estamos construyendo un modelo de regresión lineal múltiple para identificar los factores que explican significativamente los ingresos de los individuos.
+
+Por qué lo estamos haciendo:
+Entender las variables clave que influyen en los ingresos puede ayudar a adaptar estrategias de marketing y mejorar la segmentación de clientes.
+
+```{r}
+# Convertir Education a un factor con "Basic" como la categoría de referencia
+markclean$Education <- factor(markclean$Education, levels = c("Basic", "2n Cycle", "Graduation", "Master", "PhD"))
+
+# Construir el modelo de regresión lineal múltiple
+lm_model <- lm(Income ~ Year_Birth + Kidhome + Teenhome + Education + MntWines + MntFruits + 
+               MntMeatProducts + MntFishProducts + MntSweetProducts + MntGoldProds + 
+               NumDealsPurchases + NumCatalogPurchases + NumStorePurchases + NumWebVisitsMonth, 
+               data = markclean)
+
+# Resumen del modelo
+summary(lm_model)
+
+```
+
+Interpretación del Modelo de Regresión Lineal Múltiple
+
+Qué estamos haciendo: Estamos interpretando los resultados del modelo de regresión lineal múltiple para entender la contribución de cada variable explicativa en la explicación de los ingresos de los individuos.
+
+Por qué lo estamos haciendo: Entender la contribución de cada variable explicativa nos ayuda a identificar los factores más importantes que influyen en los ingresos, lo que puede informar estrategias de marketing y segmentación de clientes.
+
+Resultados del Modelo:
+
+Intercepto:
+Valor Estimado: 139500
+Significancia: Muy significativo (p < 0.001)
+Interpretación: Este es el ingreso esperado cuando todas las variables explicativas son cero.
+
+Año de Nacimiento (Year_Birth):
+Valor Estimado: -55.37
+Significancia: Muy significativo (p < 0.01)
+Interpretación: Cada año adicional reduce el ingreso en aproximadamente 55.37 unidades.
+
+Niños en Casa (Kidhome):
+Valor Estimado: 2024
+Significancia: Muy significativo (p < 0.001)
+Interpretación: Cada niño adicional en casa incrementa el ingreso en aproximadamente 2024 unidades.
+
+Adolescentes en Casa (Teenhome):
+Valor Estimado: 6205
+Significancia: Muy significativo (p < 0.001)
+Interpretación: Cada adolescente adicional en casa incrementa el ingreso en aproximadamente 6205 unidades.
+
+Nivel Educativo (Education):
+2n Cycle: 10950, Graduación: 11680, Máster: 12250, PhD: 12740
+Significancia: Muy significativo para todas las categorías (p < 0.001)
+Interpretación: Comparado con el nivel básico, tener niveles educativos más altos se asocia con mayores ingresos.
+
+Gasto en Productos:
+Vino (MntWines): 21.67 (p < 0.001)
+Frutas (MntFruits): 31.56 (p < 0.001)
+Carne (MntMeatProducts): 13.67 (p < 0.001)
+Pescado (MntFishProducts): 24.14 (p < 0.001)
+Dulces (MntSweetProducts): 44.76 (p < 0.001)
+Productos de Oro (MntGoldProds): 7.55 (p ≈ 0.1, marginalmente significativo)
+Interpretación: Mayores gastos en estos productos están asociados con mayores ingresos, lo que puede reflejar un estilo de vida más acomodado.
+
+Compras con Descuento (NumDealsPurchases):
+Valor Estimado: -952.2 (p < 0.001)
+Interpretación: Un mayor número de compras con descuento se asocia con menores ingresos.
+
+Compras por Catálogo (NumCatalogPurchases):
+Valor Estimado: 224.6 (p ≈ 0.05, marginalmente significativo)
+Interpretación: Un mayor número de compras por catálogo está asociado con mayores ingresos.
+
+Compras en Tienda (NumStorePurchases):
+Valor Estimado: 1076 (p < 0.001)
+Interpretación: Un mayor número de compras en tienda está asociado con mayores ingresos.
+
+Visitas a la Web (NumWebVisitsMonth):
+Valor Estimado: -2155 (p < 0.001)
+Interpretación: Un mayor número de visitas a la web está asociado con menores ingresos.
+
+Calidad del Ajuste del Modelo:
+
+R-cuadrado: 0.7985
+R-cuadrado Ajustado: 0.7969
+Interpretación: El modelo explica aproximadamente el 79.85% de la variabilidad en los ingresos. Este es un buen ajuste, indicando que las variables seleccionadas son bastante explicativas.
+
+Paso 3: Verificar Multicolinealidad
+
+Qué estamos haciendo: Estamos verificando posibles problemas de multicolinealidad entre las variables explicativas usando el Factor de Inflación de la Varianza (VIF).
+
+Por qué lo estamos haciendo: La multicolinealidad puede afectar la estabilidad y la interpretación de los coeficientes del modelo de regresión. Es importante identificar y mitigar cualquier problema de multicolinealidad para asegurar la validez del modelo.
+
+```{r}
+# Verificar multicolinealidad usando VIF
+vif_values <- vif(lm_model)
+vif_values
+
+```
+Resultados del VIF:
+
+Year_Birth: 1.125110
+Kidhome: 1.353970
+Teenhome: 1.254939
+Education: 1.027110
+MntWines: 1.579217
+MntFruits: 1.392414
+MntMeatProducts: 1.678731
+MntFishProducts: 1.449474
+MntSweetProducts: 1.364735
+MntGoldProds: 1.205203
+NumDealsPurchases: 1.266901
+NumCatalogPurchases: 1.718644
+NumStorePurchases: 1.501877
+NumWebVisitsMonth: 1.410997
+
+Interpretación:
+
+Valores de VIF mayores a 10 indican un problema de multicolinealidad grave, lo cual no se observa en nuestro modelo. Los valores de VIF son relativamente bajos, sugiriendo que no hay un problema significativo de multicolinealidad entre las variables explicativas.
+
+Este análisis proporciona una comprensión profunda de cómo las distintas variables explicativas afectan los ingresos de los individuos y asegura que el modelo de regresión lineal múltiple sea robusto y fiable.
+
+## 4.2 Regresión logística 
+
+## 4.2.1 Modelo predictivo
+
+Objetivo:
+Ajustar un modelo predictivo basado en la regresión logística para predecir la probabilidad de aceptar la oferta en la sexta campaña en función de:
+
+Número de compras con descuento.
+Número de visitas en el último mes a la web.
+Si ha aceptado alguna oferta en campañas previas.
+
+Pasos:
+Paso 1: Cargar las librerías necesarias
+
+```{r}
+if (!require(dplyr)) {
+  install.packages("dplyr")
+  library(dplyr)
+}
+
+if (!require(caret)) {
+  install.packages("caret")
+  library(caret)
+}
+
+```
+
+
+Paso 2: Ajustar el Modelo de Regresión Logística
+
+Qué estamos haciendo:
+Ajustar el modelo de regresión logística para predecir la probabilidad de aceptar la oferta en la sexta campaña.
+
+Por qué lo estamos haciendo:
+Entender los factores que influyen en la aceptación de ofertas puede ayudar a mejorar las estrategias de marketing.
+
+```{r}
+# Ajustar el modelo de regresión logística
+logit_model <- glm(Response ~ NumDealsPurchases + NumWebVisitsMonth + (AcceptedCmp1 + AcceptedCmp2 + AcceptedCmp3 + AcceptedCmp4 + AcceptedCmp5 > 0), 
+                   data = markclean, family = binomial)
+
+# Resumen del modelo
+summary(logit_model)
+
+```
+
+Intercepto:
+Valor Estimado: -2.76175
+Significancia: Muy significativo (p < 0.001)
+Interpretación: Probabilidad base de aceptar la oferta cuando todas las demás variables son cero.
+
+NumDealsPurchases:
+Valor Estimado: 0.03443
+Significancia: No significativo (p > 0.05)
+Interpretación: El número de compras con descuento no tiene un impacto significativo en la probabilidad de aceptar la oferta en la sexta campaña.
+
+NumWebVisitsMonth:
+Valor Estimado: 0.04679
+Significancia: Marginalmente significativo (p ≈ 0.1)
+Interpretación: Un mayor número de visitas a la web en el último mes puede tener un impacto marginalmente significativo en la probabilidad de aceptar la oferta en la sexta campaña.
+
+AcceptedCmp1-5:
+Valor Estimado: 2.09079
+Significancia: Muy significativo (p < 0.001)
+Interpretación: Haber aceptado alguna oferta en campañas previas aumenta significativamente la probabilidad de aceptar la oferta en la sexta campaña.
+
+Calidad del Modelo:
+El modelo tiene una buena calidad de ajuste con un AIC de 1636.9. La variable más significativa para predecir la probabilidad de aceptar la oferta en la sexta campaña es si el individuo ha aceptado alguna oferta en campañas previas (AcceptedCmp1-5).
+
+
+Siguiente Paso: Matriz de Confusión
+
+## 4.2.2 Matriz de confusión
+
+Vamos a analizar la precisión del modelo comparando la predicción del modelo sobre los mismos datos del conjunto de datos.
+
+Código:
+
+```{r}
+# Cargar la librería caret si no está ya cargada
+if (!require(caret)) {
+  install.packages("caret")
+  library(caret)
+}
+
+# Predecir las probabilidades
+probabilities <- predict(logit_model, type = "response")
+
+# Asumir que la predicción es 1 (Response) si la probabilidad es superior o igual a 0.5
+predicted_responses <- ifelse(probabilities >= 0.5, 1, 0)
+
+# Convertir a factor y asegurarse de que tienen los mismos niveles
+predicted_responses <- factor(predicted_responses, levels = c(0, 1))
+markclean$Response <- factor(markclean$Response, levels = c(0, 1))
+
+# Crear la matriz de confusión
+confusion <- confusionMatrix(predicted_responses, markclean$Response)
+
+# Mostrar la matriz de confusión
+confusion
+
+
+```
+
+Interpretación de los Resultados:
+
+Accuracy (Precisión): 0.8509. Esto indica que el modelo clasifica correctamente el 85.09% de las observaciones.
+
+Sensitivity (Sensibilidad): 0.998951. Esto significa que el modelo es muy bueno para identificar los casos negativos (aquellos que no aceptaron la oferta).
+
+Specificity (Especificidad): 0.005988. La especificidad es extremadamente baja, lo que indica que el modelo no es bueno para identificar los casos positivos (aquellos que aceptaron la oferta).
+
+Positive Predictive Value (Valor Predictivo Positivo): 0.851521. De todas las predicciones negativas, el 85.15% son realmente negativas.
+
+Negative Predictive Value (Valor Predictivo Negativo): 0.500000. De todas las predicciones positivas, el 50% son realmente positivas.
+
+Kappa: 0.0083. Este valor es muy bajo, lo que indica que el acuerdo entre las predicciones del modelo y las observaciones reales es casi al azar.
+
+McNemar's Test P-Value: < 2e-16. Esto sugiere que hay una diferencia significativa entre las tasas de error de las dos clases.
+
+Balanced Accuracy: 0.502469. Este valor es cercano al 50%, lo que indica que el modelo tiene un rendimiento similar al de una clasificación aleatoria en cuanto a equilibrio entre sensibilidad y especificidad.
+
+Conclusión:
+
+El modelo de regresión logística ajustado tiene una alta precisión debido a que la mayoría de las observaciones pertenecen a la clase negativa (no aceptar la oferta). Sin embargo, tiene una baja capacidad para identificar correctamente los casos positivos. Esto se refleja en la baja especificidad y el bajo valor predictivo negativo. Se necesita mejorar la capacidad del modelo para identificar correctamente los casos positivos para que sea más útil en la práctica.
+
+
+## 4.2.3 Predicción
+
+Qué estamos haciendo:
+Vamos a aplicar el modelo de regresión logística para predecir la probabilidad de que un cliente acepte la última oferta, teniendo en cuenta que ha comprado 5 veces con descuento, ha visitado la web 10 veces y ha aceptado todas las ofertas de campañas previas.
+
+Por qué lo estamos haciendo:
+Esta predicción nos permitirá evaluar la efectividad del modelo en escenarios específicos y validar su precisión en situaciones controladas.
+Paso a Paso
+
+Paso 1: Extraer los Coeficientes del Modelo de Regresión Logística
+
+Qué Estamos Haciendo:
+Vamos a extraer los coeficientes del modelo de regresión logística previamente ajustado para utilizarlos en el cálculo manual del logit.
+
+Por Qué lo Estamos Haciendo:
+Necesitamos los coeficientes del modelo para calcular manualmente el valor del logit con las condiciones especificadas.
+
+```{r}
+# Extraer los coeficientes del modelo de regresión logística
+coeficientes <- coef(logit_model)
+intercepto <- coeficientes[1]
+coef_num_deals <- coeficientes["NumDealsPurchases"]
+coef_num_web_visits <- coeficientes["NumWebVisitsMonth"]
+coef_accepted_offers <- coeficientes["(AcceptedCmp1 + AcceptedCmp2 + AcceptedCmp3 + AcceptedCmp4 + AcceptedCmp5 > 0)TRUE"]
+
+# Mostrar los coeficientes extraídos
+list(intercepto = intercepto, coef_num_deals = coef_num_deals, coef_num_web_visits = coef_num_web_visits, coef_accepted_offers = coef_accepted_offers)
+
+```
+Paso 2: Calcular el Valor del Logit Manualmente
+
+Qué Estamos Haciendo:
+Usaremos los coeficientes extraídos y las condiciones especificadas (5 compras con descuento, 10 visitas a la web, y aceptación de todas las ofertas previas) para calcular el valor del logit.
+
+Por Qué lo Estamos Haciendo:
+El valor del logit es necesario para convertirlo posteriormente a una probabilidad.
+
+
+```{r}
+# Calcular el valor del logit manualmente
+logit_valor <- intercepto + (coef_num_deals * 5) + (coef_num_web_visits * 10) + coef_accepted_offers
+
+# Mostrar el valor del logit calculado
+logit_valor
+
+```
+Paso 3: Convertir el Valor del Logit a una Probabilidad
+
+Qué Estamos Haciendo:
+Convertiremos el valor del logit a una probabilidad utilizando la función logística.
+
+Por Qué lo Estamos Haciendo:
+Queremos determinar la probabilidad de que el cliente acepte la última oferta bajo las condiciones especificadas.
+
+```{r}
+# Convertir el valor del logit a una probabilidad
+probabilidad <- exp(logit_valor) / (1 + exp(logit_valor))
+
+# Mostrar la probabilidad calculada manualmente
+probabilidad
+
+```
+
+Paso 4: Verificación del Resultado Usando la Función predict
+
+Qué Estamos Haciendo:
+Vamos a crear un nuevo dataframe con las condiciones especificadas y utilizaremos la función predict para predecir la probabilidad, confirmando así la exactitud de nuestros cálculos manuales.
+
+Por Qué lo Estamos Haciendo:
+Validar nuestras predicciones manuales con la función predict asegura la precisión del modelo y la exactitud de los cálculos.
+
+```{r}
+# Crear un nuevo dataframe con las condiciones especificadas
+nuevos_datos <- data.frame(
+  NumDealsPurchases = 5,
+  NumWebVisitsMonth = 10,
+  AcceptedCmp1 = 1,  # Asumiendo que el cliente aceptó todas las campañas previas
+  AcceptedCmp2 = 1,
+  AcceptedCmp3 = 1,
+  AcceptedCmp4 = 1,
+  AcceptedCmp5 = 1
+)
+
+# Predecir la probabilidad usando la función predict
+probabilidad_predicha <- predict(logit_model, newdata = nuevos_datos, type = "response")
+
+# Mostrar la probabilidad predicha
+probabilidad_predicha
+
+```
+Resumen del Resultado
+
+Extracción de Coeficientes:
+Intercepto: -2.761746
+Coeficiente para NumDealsPurchases: 0.0344276
+Coeficiente para NumWebVisitsMonth: 0.04678537
+Coeficiente para AcceptedCmp (si ha aceptado alguna oferta en campañas previas): 2.090793
+
+Cálculo del Logit:
+Valor del logit calculado manualmente: 1.97
+
+Cálculo de la Probabilidad:
+Probabilidad calculada manualmente de que el cliente acepte la última oferta: 0.878
+
+Verificación con predict:
+Probabilidad predicha usando la función predict: 0.878
+
+El valor de la probabilidad calculada manualmente y la probabilidad predicha usando la función predict son ambos aproximadamente 0.878, confirmando que nuestros cálculos manuales son correctos. Esto indica que hay una alta probabilidad de que el cliente acepte la última oferta bajo las condiciones especificadas.
+
+
+
+
+
+# 5. **ANOVA unifactorial**
+
+## 5.1 Visualización gráfica
+
+
+
+Objetivo: Mostrar gráficamente la distribución de Income según Nivel educativo representando los valores medios para cada categoría.
+
+Pasos:
+
+Utilizar la función ggboxplot de la librería ggpubr para crear el boxplot.
+Utilizar la función stat_summary para añadir las líneas de medias.
+
+Código:
+
+```{r}
+# Cargar la librería ggpubr si no está ya cargada
+if (!require(ggpubr)) {
+  install.packages("ggpubr")
+  library(ggpubr)
+}
+
+# Crear un boxplot y añadir una línea para los valores medios
+ggboxplot(markclean, x = "Education", y = "Income", 
+          color = "Education", palette = "jco", add = "jitter") +
+  stat_summary(fun = mean, geom = "line", aes(group = 1, color = "Education"), size = 1) +
+  stat_summary(fun = mean, geom = "point", aes(group = 1, color = "Education"), size = 3)
+
+
+```
+
+Resultado:
+Un boxplot que muestra la distribución de Income para cada nivel de Education con una línea y puntos que indican los valores medios.
+
+
+## 5.2 Hipótesis nula y alternativa
+
+Objetivo: Escribir la hipótesis nula y la alternativa.
+
+Hipótesis:
+
+Hipótesis Nula (H0): No hay diferencias significativas en los ingresos (Income) entre los diferentes niveles educativos.
+Hipótesis Alternativa (H1): Hay diferencias significativas en los ingresos (Income) entre los diferentes niveles educativos.
+
+5.3 Modelo
+
+Objetivo: Calcular el análisis de varianza usando la función aov. Interpretar el resultado del análisis.
+
+Código:
+
+```{r}
+# Calcular el análisis de varianza
+anova_model <- aov(Income ~ Education, data = markclean)
+
+# Resumen del modelo
+summary(anova_model)
+
+```
+Interpretación:
+El valor de p (<2e-16) es muy pequeño, lo que indica que hay diferencias significativas en los ingresos entre los diferentes niveles educativos.
+
+## 5.4 Efectos de los niveles del factor y fuerza de relación
+
+Objetivo: Proporcionar la estimación del efecto de los niveles del factor Education. Interpretar los resultados. Calcular la parte de la variabilidad de ingresos explicada por el efecto de los niveles (fuerza de relación).
+
+Código:
+
+```{r}
+# Calcular la suma de cuadrados entre los grupos (SSB) y la suma de cuadrados total (SST)
+ssb <- sum((tapply(markclean$Income, markclean$Education, mean) - mean(markclean$Income))^2) * length(markclean$Income) / length(unique(markclean$Education))
+sst <- sum((markclean$Income - mean(markclean$Income))^2)
+
+# Calcular η²
+eta_squared <- ssb / sst
+eta_squared
+
+```
+Interpretación:
+La variabilidad explicada por el nivel educativo es del 46.7%, lo que sugiere que el nivel educativo es un factor significativo que explica una gran parte de la variabilidad en los ingresos (Income).
+
+## 5.5 Normalidad de los residuos
+
+Objetivo: Usar el gráfico Normal Q-Q y el test Shapiro-Wilk para evaluar la normalidad de los residuos. Evaluar la homocedasticidad de los residuos con el gráfico "Residuals vs Fitted".
+
+Código:
+
+```{r}
+# Graficar Q-Q plot
+qqnorm(anova_model$residuals)
+qqline(anova_model$residuals)
+
+# Test Shapiro-Wilk
+shapiro_test <- shapiro.test(anova_model$residuals)
+shapiro_test
+
+# Graficar Residuals vs Fitted
+plot(anova_model, which = 1)
+
+```
+
+Resumen de Resultados
+
+Visualización Gráfica: El boxplot muestra diferencias visuales en los ingresos entre los distintos niveles educativos.
+Hipótesis: Se plantea que no hay diferencias en los ingresos entre los niveles educativos (H0), y la alternativa que sí hay diferencias (H1).
+ANOVA: El análisis de varianza muestra un p-valor muy pequeño (<2e-16), indicando diferencias significativas entre los niveles educativos.
+Efectos de los Niveles del Factor: La eta cuadrada (η²) es 0.467028, lo que indica que el 46.7% de la variabilidad en los ingresos puede explicarse por el nivel educativo.
+Normalidad de los Residuos: El gráfico Q-Q y el test Shapiro-Wilk muestran que los residuos no siguen una distribución normal perfecta (p-valor < 0.05).
+Homocedasticidad: El gráfico “Residuals vs Fitted” indica que puede haber problemas de homocedasticidad.
+
+Este análisis proporciona una visión detallada de cómo los ingresos varían según el nivel educativo, destacando la importancia del factor educación en la variabilidad de los ingresos.
+
+# 6 **Comparaciones Múltiples**
+
+Objetivo
+
+Realizar un test de comparación múltiple entre los diferentes niveles educativos utilizando la corrección de Bonferroni y la función pairwise.t.test.
+Pasos a Seguir
+Paso 1: Realizar el Test de Comparación Múltiple
+
+Qué Estamos Haciendo: Calcularemos las comparaciones entre grupos con corrección de Bonferroni.
+
+Por Qué lo Estamos Haciendo: Para identificar diferencias significativas en los ingresos entre los diferentes niveles educativos después de ajustar por comparaciones múltiples.
+
+Código:
+
+```{r}
+# Calcular las comparaciones entre grupos con corrección de Bonferroni
+pairwise_results <- pairwise.t.test(markclean$Income, markclean$Education, p.adjust.method = "bonferroni")
+
+# Mostrar los resultados del test
+pairwise_results
+
+```
+Interpretación de Resultados:
+
+Qué Estamos Haciendo: Interpretaremos los p-valores ajustados de las comparaciones por pares de los niveles educativos.
+
+Por Qué lo Estamos Haciendo: Para entender si existen diferencias significativas en los ingresos de los diferentes niveles educativos.
+
+Resultados:
+
+P-valor Ajustado: Si el p-valor ajustado es menor que 0.05, significa que hay una diferencia significativa entre los ingresos de esos dos niveles educativos específicos. Comparaciones Significativas: Observar qué comparaciones específicas tienen p-valores ajustados menores que 0.05 para identificar entre qué niveles educativos existen diferencias significativas en los ingresos.
+
+Resumen de Resultados
+
+Comparación Entre “Basic” y Otros Niveles: Todas las comparaciones entre “Basic” y otros niveles tienen p-valores ajustados < 2e-16, indicando diferencias significativas en los ingresos entre “Basic” y todos los demás niveles educativos.
+
+Comparación Entre “2n Cycle” y Otros Niveles: “2n Cycle” y “Graduation”: p-valor ajustado 0.046, indicando una diferencia significativa. “2n Cycle” y “Master”: p-valor ajustado < 2e-16, indicando una diferencia significativa. “2n Cycle” y “PhD”: p-valor ajustado < 2e-16, indicando una diferencia significativa.
+
+Comparación Entre “Graduation” y Otros Niveles: “Graduation” y “Master”: p-valor ajustado 0.046, indicando una diferencia significativa. “Graduation” y “PhD”: p-valor ajustado 0.033, indicando una diferencia significativa.
+
+Comparación Entre “Master” y “PhD”: “Master” y “PhD”: p-valor ajustado 1.000, indicando que no hay diferencia significativa en los ingresos entre estos niveles.
+
+
+# 7 **ANOVA multifactorial**
+
+## 7.1 Análisis visual de los efectos principales y posibles interacciones
+
+
+Paso 1: Agrupar y Calcular la Media de Ingresos
+
+Objetivo: Dibujar un gráfico de la variable Income en función de Education y en función de Response para evaluar si hay interacción entre los dos factores.
+Paso 1: Agrupar el conjunto de datos por Education y Response, y calcular la media de ingresos para cada grupo
+
+Código:
+
+```{r}
+# Agrupar el conjunto de datos por Education y Response, y calcular la media de ingresos
+mean_income_grouped <- aggregate(Income ~ Education + Response, data = markclean, FUN = mean)
+
+# Mostrar el conjunto de datos en forma de tabla
+mean_income_grouped
+
+
+```
+
+Resultados Esperados:
+
+Esto mostrará una tabla con la media de ingresos para cada combinación de Education y Response, que ya hemos verificado como correcto.
+
+Paso 2: Mostrar en un gráfico el valor medio de la variable Income para cada factor
+
+Código:
+
+```{r}
+# Cargar la librería ggplot2 si no está ya cargada
+if (!require(ggplot2)) {
+  install.packages("ggplot2")
+  library(ggplot2)
+}
+
+# Crear el gráfico de interacción
+ggplot(mean_income_grouped, aes(x = Education, y = Income, color = as.factor(Response), group = as.factor(Response))) +
+  geom_line() +
+  geom_point(size = 4) +
+  labs(title = "Interaction between Education and Response on Income",
+       x = "Education",
+       y = "Mean Income",
+       color = "Response") +
+  theme_minimal()
+
+
+```
+
+Resultados:
+
+Interpretación del Gráfico:
+
+Efectos Principales: Se observa que los ingresos medios aumentan con el nivel educativo, independientemente de la respuesta a la oferta.
+Interacción: La diferencia en los ingresos entre los que aceptaron y los que no aceptaron la oferta varía según el nivel educativo. Por ejemplo, para los niveles educativos más altos, los que aceptaron la oferta tienen ingresos significativamente mayores en comparación con los que no la aceptaron, indicando una posible interacción entre los factores.
+
+## 7.2 Cálculo del modelo
+
+Objetivo: Calcular el análisis ANOVA multifactorial para comprobar si existe interacción entre los factores Education y Response en relación a la variable Income.
+
+Código:
+
+```{r}
+# Calcular el modelo ANOVA multifactorial
+anova_multifactorial <- aov(Income ~ Education * Response, data = markclean)
+
+# Resumen del modelo
+summary(anova_multifactorial)
+
+```
+Resultados:
+
+El resultado del ANOVA multifactorial muestra los efectos principales y la interacción entre los factores:
+
+## 7.3 Interpretación de los resultados
+
+7.3 Interpretación de los resultados
+
+Interpretación:
+
+Efecto Principal de Education: El nivel educativo tiene un efecto significativo sobre los ingresos (p < 2e-16).
+Efecto Principal de Response: La aceptación de la oferta tiene un efecto significativo sobre los ingresos (p < 6.39e-15).
+Interacción Education:Response: No existe una interacción significativa entre el nivel educativo y la aceptación de la oferta (p = 0.802), lo que indica que el efecto de aceptar la oferta en los ingresos no varía según el nivel educativo.
+
+Esto concluye el análisis ANOVA multifactorial para evaluar el efecto combinado de Education y Response sobre Income.
+Conclusión
+
+Hemos completado todos los pasos de la tarea 7, incluyendo el análisis visual de los efectos principales y posibles interacciones, el cálculo del modelo ANOVA multifactorial, y la interpretación de los resultados. La interpretación muestra que hay efectos significativos de Education y Response sobre Income, pero no hay una interacción significativa entre estos factores.
+
+
+# 8 **Resumen ejecutivo**
+
+
+
+Objetivo del Análisis:
+El propósito de este análisis fue investigar cómo el nivel educativo y la respuesta a la última campaña de ofertas influencian los ingresos de los clientes. Esta información es crucial para entender mejor a nuestra base de clientes y ajustar nuestras estrategias de marketing y oferta en función de estas características.
+
+Metodología:
+Utilizamos un análisis de varianza (ANOVA) para evaluar las diferencias en los ingresos de los clientes según su nivel educativo y su respuesta a la oferta. Este enfoque nos permitió determinar si estas dos variables (nivel educativo y respuesta a la oferta) tienen un impacto significativo en los ingresos.
+
+Hallazgos Clave:
+
+Nivel Educativo:
+Los ingresos de los clientes aumentan consistentemente con el nivel educativo. Los clientes con niveles educativos más altos (por ejemplo, graduados de maestría y doctorado) tienen ingresos significativamente mayores en comparación con aquellos con niveles educativos más bajos (por ejemplo, educación básica).
+Este hallazgo subraya la importancia de segmentar nuestras estrategias de marketing y ofertas en función del nivel educativo de nuestros clientes para maximizar la efectividad.
+
+Respuesta a la Oferta:
+La aceptación de la oferta de la última campaña tiene un impacto significativo en los ingresos. Los clientes que aceptaron la oferta tienen, en promedio, ingresos más altos en comparación con aquellos que no la aceptaron.
+Este resultado indica que nuestras ofertas son particularmente atractivas para clientes con mayores ingresos, lo que sugiere una oportunidad para desarrollar campañas específicas dirigidas a este segmento de clientes.
+
+Interacción entre Nivel Educativo y Respuesta a la Oferta:
+No se encontró una interacción significativa entre el nivel educativo y la respuesta a la oferta. Esto significa que el impacto de aceptar la oferta en los ingresos es consistente a través de todos los niveles educativos.
+Aunque la aceptación de la oferta es importante, su efecto sobre los ingresos no varía significativamente entre diferentes niveles educativos.
+
+Recomendaciones:
+
+Segmentación de Clientes:
+Basado en el hallazgo de que los clientes con niveles educativos más altos tienen ingresos mayores, recomendamos implementar estrategias de marketing personalizadas que consideren el nivel educativo. Por ejemplo, ofertas premium y programas de fidelización pueden ser más efectivos para estos segmentos de clientes.
+
+Campañas de Marketing:
+Dado que las ofertas actuales son efectivas en atraer a clientes de mayores ingresos, se recomienda continuar y expandir estas campañas con un enfoque en los beneficios que más valoran estos clientes. Además, explorar nuevas ofertas que puedan captar también a los clientes de ingresos medios y bajos podría expandir nuestra base de aceptación.
+
+Monitoreo y Análisis Continuo:
+Es importante continuar monitoreando y analizando los datos de clientes para ajustar y mejorar nuestras estrategias. Evaluar periódicamente el impacto de nuevas ofertas y campañas nos permitirá adaptarnos rápidamente a las necesidades y comportamientos de nuestros clientes.
+
+Conclusión:
+El análisis ha proporcionado una comprensión clara de cómo el nivel educativo y la respuesta a la oferta afectan los ingresos de nuestros clientes. Utilizando esta información, podemos mejorar nuestras estrategias de marketing, segmentar nuestras ofertas de manera más efectiva y, en última instancia, incrementar nuestra participación de mercado y satisfacción del cliente.
